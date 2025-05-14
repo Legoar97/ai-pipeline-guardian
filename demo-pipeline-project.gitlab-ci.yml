@@ -1,0 +1,15 @@
+stages:
+  - test
+  - build
+
+test_job:
+  stage: test
+  image: python:3.11
+  script:
+    - echo "Running tests..."
+    - python -c "assert 2 + 2 == 5"  # Falla a propósito
+
+build_job:
+  stage: build
+  script:
+    - echo "This won't run because test fails"
