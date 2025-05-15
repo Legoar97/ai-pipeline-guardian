@@ -7,16 +7,16 @@ import aiohttp
 from app.gitlab_client import GitLabClient
 from app.ai_analyzer import AIAnalyzer
 
-# Configurar logging
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="AI Pipeline Guardian")
 
-# Variables de entorno
+# Environment variables
 GITLAB_WEBHOOK_SECRET = os.getenv("GITLAB_WEBHOOK_SECRET", "")
 
-# Inicializar clientes
+# Initialize clients
 gitlab_client = GitLabClient()
 ai_analyzer = AIAnalyzer()
 
@@ -50,7 +50,7 @@ async def root():
                     <h3>Configuration</h3>
                     <p><strong>Webhook URL:</strong> <code>POST /webhook</code></p>
                     <p><strong>GitLab Events:</strong> Pipeline Hook</p>
-                    <p><strong>AI Model:</strong> Vertex AI (Gemini Pro) 🧠</p>
+                    <p><strong>AI Model:</strong> Vertex AI (Gemini 2.0 Flash) 🧠</p>
                     <p><strong>Project:</strong> <code>ai-pipeline-guardian</code></p>
                     
                     <h3>Features</h3>
@@ -78,18 +78,18 @@ async def gitlab_webhook(
     x_gitlab_token: str = Header(None, alias="X-Gitlab-Token"),
     x_gitlab_event: str = Header(None, alias="X-Gitlab-Event")
 ):
-    # Validar webhook secret
+    # Validate webhook secret
     if GITLAB_WEBHOOK_SECRET and x_gitlab_token != GITLAB_WEBHOOK_SECRET:
         logger.warning("Invalid webhook token")
         raise HTTPException(status_code=401, detail="Invalid webhook token")
     
-    # Obtener el body
+    # Get the body
     body = await request.json()
     
     logger.info(f"Received event: {x_gitlab_event}")
     logger.info(f"Project: {body.get('project', {}).get('name', 'Unknown')}")
     
-    # Procesar eventos de pipeline
+    # Process pipeline events
     if x_gitlab_event == "Pipeline Hook":
         object_attributes = body.get("object_attributes", {})
         status = object_attributes.get("status")
@@ -103,12 +103,12 @@ async def gitlab_webhook(
             
             logger.info(f"Pipeline failed! Project: {project_name}, Pipeline ID: {pipeline_id}, Branch: {ref}")
             
-            # Analizar el fallo con IA
+            # Analyze the failure with AI
             try:
-                # Obtener jobs del pipeline
+                # Get jobs from the pipeline
                 jobs = await gitlab_client.get_pipeline_jobs(project_id, pipeline_id)
                 
-                # Buscar jobs fallidos
+                # Find failed jobs
                 failed_jobs = [job for job in jobs if job.get("status") == "failed"]
                 logger.info(f"Found {len(failed_jobs)} failed jobs")
                 
@@ -122,21 +122,21 @@ async def gitlab_webhook(
                     
                     logger.info(f"Analyzing failed job: {job_name} (ID: {job_id})")
                     
-                    # Obtener log del job
+                    # Get job log
                     job_log = await gitlab_client.get_job_trace(project_id, job_id)
                     if not job_log:
                         logger.warning(f"No log found for job {job_name}")
                         continue
                     
-                    # Analizar con IA
+                    # Analyze with AI
                     logger.info(f"Sending log to AI for analysis...")
                     analysis = await ai_analyzer.analyze_failure(job_log, job_name)
                     analyzed_count += 1
                     
                     logger.info(f"AI Analysis: Category={analysis['error_category']}, Action={analysis['recommended_action']}")
                     
-                    # Tomar acción basada en el análisis
-                    if analysis["recommended_action"] == "reintentar" and analysis["error_category"] == "transitorio":
+                    # Take action based on analysis
+                    if analysis["recommended_action"] == "retry" and analysis["error_category"] == "transient":
                         logger.info(f"AI recommends retry for transient error in job {job_name}")
                         success = await gitlab_client.retry_job(project_id, job_id)
                         if success:
@@ -145,7 +145,8 @@ async def gitlab_webhook(
                         else:
                             logger.error(f"Failed to retry job {job_name}")
 
-                    # Crear comentario con el análisis
+                    # Create a comment with the analysis
+                    # Using Unicode emojis for compatibility with GitLab
                     comment = f"""🤖 **AI Pipeline Guardian Analysis**
 
 **Pipeline:** #{pipeline_id} on `{ref}`
@@ -164,40 +165,63 @@ async def gitlab_webhook(
 ---
 *This analysis was generated automatically by AI Pipeline Guardian*"""
                     
-                    # Inicializar comentario posteado
+                    # Initialize comment posted
                     comment_posted = False
                     
-                    # Por ahora, loguear el comentario
+                    # Log the comment
                     logger.info(f"Analysis comment:\n{comment}")
                     
-                    # Intentar comentar en el commit más reciente del proyecto
+                    # Try to comment on the most recent commit of the project
                     try:
-                        # Para commits directo en main
+                        # First look in the webhook commits
                         commits = body.get("commits", [])
-                        if commits:
-                            # Usar el último commit
+                        commit_sha = None
+                        
+                        if commits and len(commits) > 0:
+                            # Use the last commit
                             commit_sha = commits[-1].get("id")
-                            if commit_sha:
-                                success = await gitlab_client.create_commit_comment(
-                                    project_id, commit_sha, comment
-                                )
-                                if success:
-                                    comment_posted = True
-                                    comment_count += 1
-                                    logger.info(f"Posted comment to commit {commit_sha[:8]}")
-                                else:
-                                    logger.error("Failed to post comment to commit")
+                            logger.info(f"Found commit in webhook payload: {commit_sha[:8] if commit_sha else 'None'}")
+                        
+                        # If no commits in webhook, get from pipeline details
+                        if not commit_sha:
+                            # Get pipeline details
+                            pipeline_details = await gitlab_client.get_pipeline_details(project_id, pipeline_id)
+                            commit_sha = pipeline_details.get("sha")
+                            logger.info(f"Found commit from pipeline details: {commit_sha[:8] if commit_sha else 'None'}")
+                        
+                        # If we still don't have the commit, get the latest from the branch
+                        if not commit_sha:
+                            # Get latest commit from the branch
+                            commit_info = await gitlab_client.get_latest_commit(project_id, ref)
+                            commit_sha = commit_info.get("id")
+                            logger.info(f"Found latest commit from branch: {commit_sha[:8] if commit_sha else 'None'}")
+                        
+                        if commit_sha:
+                            logger.info(f"Posting comment to commit {commit_sha[:8]}")
+                            success = await gitlab_client.create_commit_comment(
+                                project_id, commit_sha, comment
+                            )
+                            if success:
+                                comment_posted = True
+                                comment_count += 1
+                                logger.info(f"Posted comment to commit {commit_sha[:8]}")
+                            else:
+                                logger.error("Failed to post comment to commit")
+                        else:
+                            logger.warning("No commit found to comment on")
                     except Exception as e:
                         logger.error(f"Error posting commit comment: {e}")
+                        import traceback
+                        logger.error(traceback.format_exc())
                     
-                    # Si no se pudo comentar en commit, intentar en MR
+                    # If we couldn't comment on commit, try MR
                     if not comment_posted:
                         try:
                             merge_request = body.get("merge_request")
                             if merge_request:
                                 mr_iid = merge_request.get("iid")
                                 if mr_iid:
-                                    # Verificar si el método está implementado
+                                    # Check if the method is implemented
                                     if hasattr(gitlab_client, 'create_merge_request_note'):
                                         success = await gitlab_client.create_merge_request_note(
                                             project_id, mr_iid, comment
@@ -211,7 +235,7 @@ async def gitlab_webhook(
                         except Exception as e:
                             logger.error(f"Error posting MR comment: {e}")
                     
-                    # Si todo falla, al menos logueamos el análisis
+                    # If all fails, at least we logged the analysis
                     if not comment_posted:
                         logger.warning("Could not post comment to GitLab, but analysis was completed")
                 
@@ -243,22 +267,22 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "ai-pipeline-guardian",
-        "ai": "vertex-ai-gemini-pro",
+        "ai": "vertex-ai-gemini-2.0-flash",
         "version": "1.0.0"
     }
 
 @app.get("/stats")
 async def get_stats():
-    """Endpoint para estadísticas (futuro)"""
+    """Endpoint for statistics (future)"""
     return {
         "total_pipelines_analyzed": 0,
         "success_rate": 0,
-        "ai_model": "gemini-pro"
+        "ai_model": "gemini-2.0-flash-001"
     }
 
 @app.get("/debug-token")
 async def debug_token():
-    """Endpoint para depurar el token de GitLab (solo desarrollo)"""
+    """Endpoint for debugging GitLab token (development only)"""
     token = os.getenv("GITLAB_ACCESS_TOKEN", "")
     return {
         "token_present": bool(token),

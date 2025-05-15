@@ -5,7 +5,7 @@ import json
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
-# Importar correctamente Vertex AI
+# Import Vertex AI correctly
 import google.auth
 from google.cloud import aiplatform
 import vertexai
@@ -15,66 +15,42 @@ logger = logging.getLogger(__name__)
 
 class AIAnalyzer:
     def __init__(self):
-        """Inicializar Vertex AI con las credenciales apropiadas"""
+        """Initialize Vertex AI with appropriate credentials"""
         try:
             project_id = os.getenv("GCP_PROJECT_ID", "ai-pipeline-guardian")
             location = os.getenv("GCP_LOCATION", "us-central1")
             
-            # En Cloud Run, las credenciales se obtienen automáticamente
             logger.info(f"Initializing AI Analyzer for project {project_id}")
             
-            # Obtener credenciales
-            try:
-                # Intentar usar Application Default Credentials
-                credentials, _ = google.auth.default()
-                logger.info("Using Application Default Credentials")
-            except Exception as e:
-                logger.error(f"Failed to get default credentials: {e}")
-                logger.info("Proceeding without explicit credentials...")
-                credentials = None
+            # Simplified initialization to avoid get_universe_domain error
+            vertexai.init(project=project_id, location=location)
             
-            # Inicializar Vertex AI
-            try:
-                if credentials:
-                    vertexai.init(
-                        project=project_id, 
-                        location=location,
-                        credentials=credentials
-                    )
-                else:
-                    # Sin credenciales explícitas, confiar en las ADC de Cloud Run
-                    vertexai.init(
-                        project=project_id, 
-                        location=location
-                    )
-                
-                # Usar Gemini Pro
-                self.model = GenerativeModel("gemini-pro")
-                
-                # Configuración de generación
-                self.generation_config = GenerationConfig(
-                    temperature=0.2,
-                    top_p=0.8,
-                    top_k=40,
-                    max_output_tokens=1024,
-                )
-                
-                # Executor para operaciones síncronas
-                self.executor = ThreadPoolExecutor(max_workers=3)
-                
-                logger.info(f"AI Analyzer initialized with Gemini Pro for project {project_id}")
-                
-            except Exception as e:
-                logger.error(f"Failed to initialize AI Model: {e}")
-                self.model = None
-                
+            # Use Gemini 2.0 Flash
+            logger.info("Creating GenerativeModel...")
+            self.model = GenerativeModel("gemini-2.0-flash-001")
+            
+            # Generation configuration
+            self.generation_config = GenerationConfig(
+                temperature=0.2,
+                top_p=0.8,
+                top_k=40,
+                max_output_tokens=1024,
+            )
+            
+            # Executor for synchronous operations
+            self.executor = ThreadPoolExecutor(max_workers=3)
+            
+            logger.info(f"AI Analyzer initialized with Gemini 2.0 Flash")
+            
         except Exception as e:
             logger.error(f"Failed to initialize AI Analyzer: {e}")
-            # Fallback a análisis simple si falla Vertex AI
+            import traceback
+            logger.error(traceback.format_exc())
+            # Fallback to simple analysis if Vertex AI fails
             self.model = None
     
     def _sync_analyze(self, prompt: str) -> str:
-        """Método síncrono para llamar al modelo"""
+        """Synchronous method to call the model"""
         try:
             response = self.model.generate_content(
                 prompt,
@@ -83,45 +59,47 @@ class AIAnalyzer:
             return response.text
         except Exception as e:
             logger.error(f"Error generating content: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             raise
     
     async def analyze_failure(self, job_log: str, job_name: str = "") -> Dict:
-        """Analiza un log de fallo usando Vertex AI"""
+        """Analyze a failure log using Vertex AI"""
         
-        # Si no hay modelo (falló la inicialización), usar análisis simple
+        # If no model (initialization failed), use simple analysis
         if not self.model:
             logger.warning("Using simple analysis as AI model is not available")
             return self._simple_analysis(job_log, job_name)
         
-        # Limitar el log a los últimos 4000 caracteres para no exceder límites
+        # Limit log to last 4000 characters to avoid exceeding limits
         truncated_log = job_log[-4000:] if len(job_log) > 4000 else job_log
         
-        prompt = f"""Analiza el siguiente log de CI/CD de un job llamado '{job_name}' que ha fallado.
+        prompt = f"""Analyze the following CI/CD log from a job named '{job_name}' that has failed.
 
-Proporciona tu análisis en formato JSON con exactamente esta estructura:
+Provide your analysis in JSON format with exactly this structure:
 {{
-    "error_explanation": "descripción breve del error (máximo 2 frases)",
-    "error_category": "una de: transitorio, formato, test_fallido, dependencia, configuracion, otro",
-    "recommended_action": "una de: reintentar, fix_automatico, sugerencia_manual",
-    "suggested_solution": "solución específica y accionable"
+    "error_explanation": "brief description of the error (maximum 2 sentences)",
+    "error_category": "one of: transient, formatting, failed_test, dependency, configuration, other",
+    "recommended_action": "one of: retry, automatic_fix, manual_suggestion",
+    "suggested_solution": "specific and actionable solution"
 }}
 
-Categorías de error:
-- transitorio: errores de red, timeouts, fallos intermitentes
-- formato: errores de estilo de código, linting
-- test_fallido: tests unitarios o de integración fallidos
-- dependencia: paquetes faltantes, versiones incompatibles (como 'ModuleNotFoundError')
-- configuracion: variables de entorno faltantes, archivos de config incorrectos
-- otro: cualquier otro tipo de error
+Error categories:
+- transient: network errors, timeouts, intermittent failures
+- formatting: code style errors, linting
+- failed_test: unit or integration tests failing
+- dependency: missing packages, incompatible versions (like 'ModuleNotFoundError')
+- configuration: missing environment variables, incorrect config files
+- other: any other type of error
 
-IMPORTANTE: Responde SOLO con el JSON, sin texto adicional ni backticks.
+IMPORTANT: Respond ONLY with the JSON, no additional text or backticks.
 
-Log del job:
+Job log:
 {truncated_log}
 """
         
         try:
-            # Ejecutar análisis en thread pool para no bloquear
+            # Run analysis in thread pool to avoid blocking
             loop = asyncio.get_event_loop()
             response_text = await loop.run_in_executor(
                 self.executor, 
@@ -129,9 +107,9 @@ Log del job:
                 prompt
             )
             
-            # Intentar parsear la respuesta como JSON
+            # Try to parse the response as JSON
             try:
-                # Limpiar la respuesta
+                # Clean the response
                 cleaned_response = response_text.strip()
                 if cleaned_response.startswith("```"):
                     cleaned_response = cleaned_response.split("```")[1]
@@ -140,11 +118,11 @@ Log del job:
                 
                 result = json.loads(cleaned_response.strip())
                 
-                # Validar que tiene los campos requeridos
+                # Validate that it has the required fields
                 required_fields = ["error_explanation", "error_category", "recommended_action", "suggested_solution"]
                 for field in required_fields:
                     if field not in result:
-                        result[field] = "No disponible"
+                        result[field] = "Not available"
                 
                 logger.info(f"AI Analysis complete: {result['error_category']}")
                 return result
@@ -160,48 +138,48 @@ Log del job:
             return self._simple_analysis(job_log, job_name)
     
     def _simple_analysis(self, job_log: str, job_name: str) -> Dict:
-        """Análisis simple basado en palabras clave cuando falla Vertex AI"""
+        """Simple keyword-based analysis when Vertex AI fails"""
         log_lower = job_log.lower()
         
         if "timeout" in log_lower or "timed out" in log_lower:
             return {
-                "error_explanation": "El job falló por timeout",
-                "error_category": "transitorio",
-                "recommended_action": "reintentar",
-                "suggested_solution": "El job excedió el tiempo límite. Se recomienda reintentar."
+                "error_explanation": "The job failed due to a timeout",
+                "error_category": "transient",
+                "recommended_action": "retry",
+                "suggested_solution": "The job exceeded its time limit. Retry is recommended."
             }
         elif "network" in log_lower or "connection" in log_lower:
             return {
-                "error_explanation": "Error de conectividad de red",
-                "error_category": "transitorio",
-                "recommended_action": "reintentar",
-                "suggested_solution": "Fallo de conexión de red. Se recomienda reintentar."
+                "error_explanation": "Network connectivity error",
+                "error_category": "transient",
+                "recommended_action": "retry",
+                "suggested_solution": "Network connection failure. Retry is recommended."
             }
         elif "syntaxerror" in log_lower or "unexpected eof" in log_lower:
             return {
-                "error_explanation": "Error de sintaxis en el código Python",
-                "error_category": "formato",
-                "recommended_action": "sugerencia_manual",
-                "suggested_solution": "Revisar la sintaxis del código. Parece faltar cerrar paréntesis o comillas."
+                "error_explanation": "Python syntax error in code",
+                "error_category": "formatting",
+                "recommended_action": "manual_suggestion",
+                "suggested_solution": "Review the code syntax. Appears to be missing closing parentheses or quotes."
             }
         elif "modulenotfounderror" in log_lower or "no module named" in log_lower or "import error" in log_lower:
             return {
-                "error_explanation": "Módulo o dependencia faltante",
-                "error_category": "dependencia",
-                "recommended_action": "sugerencia_manual",
-                "suggested_solution": "Instalar las dependencias faltantes. Agregar el módulo a requirements.txt"
+                "error_explanation": "Missing module or dependency",
+                "error_category": "dependency",
+                "recommended_action": "manual_suggestion",
+                "suggested_solution": "Install the missing dependencies. Add the module to requirements.txt"
             }
-        elif "test failed" in log_lower or "assertion" in log_lower or "test error" in log_lower:
+        elif "test failed" in log_lower or "assertion" in log_lower or "test error" in log_lower or "exit code 1" in log_lower:
             return {
-                "error_explanation": "Fallo en las pruebas",
-                "error_category": "test_fallido",
-                "recommended_action": "sugerencia_manual",
-                "suggested_solution": "Revisar las pruebas fallidas y corregir el código"
+                "error_explanation": "Test failures detected",
+                "error_category": "failed_test",
+                "recommended_action": "manual_suggestion",
+                "suggested_solution": "Review the failing tests and fix the code"
             }
         else:
             return {
-                "error_explanation": "Error no identificado automáticamente",
-                "error_category": "otro",
-                "recommended_action": "sugerencia_manual",
-                "suggested_solution": "Revisar los logs manualmente para identificar el problema"
+                "error_explanation": "Error not automatically identified",
+                "error_category": "other",
+                "recommended_action": "manual_suggestion",
+                "suggested_solution": "Manually review the logs to identify the issue"
             }
