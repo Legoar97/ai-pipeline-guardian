@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse
 import json
 import os
 import logging
-import aiohttp  # ⬅️ AGREGAR ESTA IMPORTACIÓN
+import aiohttp
 from app.gitlab_client import GitLabClient
 from app.ai_analyzer import AIAnalyzer
 
@@ -164,8 +164,8 @@ async def gitlab_webhook(
 ---
 *This analysis was generated automatically by AI Pipeline Guardian*"""
                     
-                    # INICIALIZAR comment_posted
-                    comment_posted = False  # ⬅️ AGREGAR ESTA LÍNEA
+                    # Inicializar comentario posteado
+                    comment_posted = False
                     
                     # Por ahora, loguear el comentario
                     logger.info(f"Analysis comment:\n{comment}")
@@ -192,17 +192,24 @@ async def gitlab_webhook(
                     
                     # Si no se pudo comentar en commit, intentar en MR
                     if not comment_posted:
-                        merge_request = body.get("merge_request")
-                        if merge_request:
-                            mr_iid = merge_request.get("iid")
-                            if mr_iid:
-                                success = await gitlab_client.create_merge_request_note(
-                                    project_id, mr_iid, comment
-                                )
-                                if success:
-                                    comment_posted = True
-                                    comment_count += 1
-                                    logger.info(f"Posted comment to MR #{mr_iid}")
+                        try:
+                            merge_request = body.get("merge_request")
+                            if merge_request:
+                                mr_iid = merge_request.get("iid")
+                                if mr_iid:
+                                    # Verificar si el método está implementado
+                                    if hasattr(gitlab_client, 'create_merge_request_note'):
+                                        success = await gitlab_client.create_merge_request_note(
+                                            project_id, mr_iid, comment
+                                        )
+                                        if success:
+                                            comment_posted = True
+                                            comment_count += 1
+                                            logger.info(f"Posted comment to MR #{mr_iid}")
+                                    else:
+                                        logger.warning("create_merge_request_note method not implemented")
+                        except Exception as e:
+                            logger.error(f"Error posting MR comment: {e}")
                     
                     # Si todo falla, al menos logueamos el análisis
                     if not comment_posted:
@@ -247,4 +254,14 @@ async def get_stats():
         "total_pipelines_analyzed": 0,
         "success_rate": 0,
         "ai_model": "gemini-pro"
+    }
+
+@app.get("/debug-token")
+async def debug_token():
+    """Endpoint para depurar el token de GitLab (solo desarrollo)"""
+    token = os.getenv("GITLAB_ACCESS_TOKEN", "")
+    return {
+        "token_present": bool(token),
+        "token_length": len(token) if token else 0,
+        "token_prefix": token[:4] + "..." if token else ""
     }

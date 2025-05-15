@@ -9,7 +9,11 @@ class GitLabClient:
     def __init__(self, gitlab_url: str = "https://gitlab.com", token: Optional[str] = None):
         self.gitlab_url = gitlab_url
         self.token = token or os.getenv("GITLAB_ACCESS_TOKEN", "")
-        self.headers = {"PRIVATE-TOKEN": self.token} if self.token else {}
+        self.headers = {}
+        if self.token:
+            self.headers["PRIVATE-TOKEN"] = self.token
+            # También agregar header de autorización alternativo para algunos endpoints
+            self.headers["Authorization"] = f"Bearer {self.token}"
         logger.info(f"GitLab client initialized. Token present: {'Yes' if self.token else 'No'}")
         
     async def get_pipeline_jobs(self, project_id: int, pipeline_id: int) -> List[Dict]:
@@ -18,22 +22,28 @@ class GitLabClient:
         
         async with aiohttp.ClientSession() as session:
             try:
-                # Intentar primero con token si está disponible
-                headers = self.headers if self.token else {}
-                async with session.get(url, headers=headers) as response:
+                logger.info(f"Getting jobs for pipeline {pipeline_id}")
+                # Intentar con token si está disponible
+                async with session.get(url, headers=self.headers) as response:
                     if response.status == 200:
-                        return await response.json()
+                        result = await response.json()
+                        logger.info(f"Found {len(result)} jobs")
+                        return result
                     else:
                         text = await response.text()
                         logger.error(f"Error getting jobs: {response.status}")
                         logger.error(f"Response: {text}")
                         
-                        # Si falla con token, intentar sin token (público)
-                        if response.status in [401, 403] and self.token:
+                        # Si falla, intentar sin token para proyectos públicos
+                        if response.status in [401, 403]:
                             logger.info("Retrying without token for public access...")
                             async with session.get(url) as public_response:
                                 if public_response.status == 200:
-                                    return await public_response.json()
+                                    result = await public_response.json()
+                                    logger.info(f"Found {len(result)} jobs (public access)")
+                                    return result
+                                else:
+                                    logger.error(f"Failed without token too: {public_response.status}")
                         return []
             except Exception as e:
                 logger.error(f"Exception getting jobs: {e}")
@@ -43,25 +53,36 @@ class GitLabClient:
         """Obtiene el log de un job específico"""
         url = f"{self.gitlab_url}/api/v4/projects/{project_id}/jobs/{job_id}/trace"
         
+        logger.info(f"Getting trace for job {job_id} of project {project_id}")
+        
         async with aiohttp.ClientSession() as session:
             try:
-                # Si el proyecto es público, intentar sin token primero
+                # Intentar con token primero si está disponible
+                if self.token:
+                    logger.info("Trying with token...")
+                    async with session.get(url, headers=self.headers) as response:
+                        if response.status == 200:
+                            logger.info("Successfully retrieved job trace with token")
+                            return await response.text()
+                        else:
+                            status = response.status
+                            text = await response.text()
+                            logger.error(f"Error getting job trace with token: {status}")
+                            logger.error(f"Response: {text}")
+                
+                # Intentar sin token para proyectos públicos
+                logger.info("Trying without token...")
                 async with session.get(url) as response:
                     if response.status == 200:
+                        logger.info("Successfully retrieved job trace without token")
                         return await response.text()
-                    
-                    # Si falla, intentar con token
-                    if self.token and response.status in [401, 403]:
-                        logger.info("Retrying with token...")
-                        async with session.get(url, headers=self.headers) as auth_response:
-                            if auth_response.status == 200:
-                                return await auth_response.text()
-                            else:
-                                logger.error(f"Error getting job trace with token: {auth_response.status}")
-                                return ""
                     else:
-                        logger.error(f"Error getting job trace: {response.status}")
+                        status = response.status
+                        text = await response.text()
+                        logger.error(f"Error getting job trace without token: {status}")
+                        logger.error(f"Response: {text}")
                         return ""
+                        
             except Exception as e:
                 logger.error(f"Exception getting job trace: {e}")
                 return ""
@@ -76,6 +97,7 @@ class GitLabClient:
         
         async with aiohttp.ClientSession() as session:
             try:
+                logger.info(f"Attempting to retry job {job_id}")
                 async with session.post(url, headers=self.headers) as response:
                     success = response.status == 201
                     if success:
@@ -90,30 +112,48 @@ class GitLabClient:
                 return False
     
     async def create_commit_comment(self, project_id: int, sha: str, body: str) -> bool:
-        """Crea un comentario en un commit - simplificado para proyectos públicos"""
-        # Para proyectos públicos, podemos usar la API sin autenticación
+        """Crea un comentario en un commit"""
         url = f"{self.gitlab_url}/api/v4/projects/{project_id}/repository/commits/{sha}/comments"
         data = {"note": body}
         
+        logger.info(f"Creating commit comment on {sha[:8]}")
+        
         async with aiohttp.ClientSession() as session:
             try:
-                # Primero intentar sin token (si el proyecto es público)
-                async with session.post(url, json=data) as response:
-                    if response.status == 201:
-                        return True
-                    
-                    # Si falla, intentar con token
-                    if self.token and response.status in [401, 403]:
-                        async with session.post(url, headers=self.headers, json=data) as auth_response:
-                            success = auth_response.status == 201
-                            if not success:
-                                text = await auth_response.text()
-                                logger.error(f"Failed to create commit comment with token: {text}")
-                            return success
+                # Intentar con token si está disponible
+                headers = self.headers if self.token else {}
+                async with session.post(url, headers=headers, json=data) as response:
+                    success = response.status == 201
+                    if success:
+                        logger.info(f"Successfully created commit comment")
                     else:
                         text = await response.text()
-                        logger.error(f"Failed to create commit comment: {text}")
-                        return False
+                        logger.error(f"Failed to create commit comment: {response.status}")
+                        logger.error(f"Response: {text}")
+                    return success
             except Exception as e:
                 logger.error(f"Exception creating commit comment: {e}")
+                return False
+    
+    async def create_merge_request_note(self, project_id: int, mr_iid: int, body: str) -> bool:
+        """Crea un comentario en un merge request"""
+        url = f"{self.gitlab_url}/api/v4/projects/{project_id}/merge_requests/{mr_iid}/notes"
+        data = {"body": body}
+        
+        logger.info(f"Creating MR note on {mr_iid}")
+        
+        async with aiohttp.ClientSession() as session:
+            try:
+                headers = self.headers if self.token else {}
+                async with session.post(url, headers=headers, json=data) as response:
+                    success = response.status == 201
+                    if success:
+                        logger.info(f"Successfully created MR note")
+                    else:
+                        text = await response.text()
+                        logger.error(f"Failed to create MR note: {response.status}")
+                        logger.error(f"Response: {text}")
+                    return success
+            except Exception as e:
+                logger.error(f"Exception creating MR note: {e}")
                 return False

@@ -20,32 +20,54 @@ class AIAnalyzer:
             project_id = os.getenv("GCP_PROJECT_ID", "ai-pipeline-guardian")
             location = os.getenv("GCP_LOCATION", "us-central1")
             
+            # En Cloud Run, las credenciales se obtienen automáticamente
+            logger.info(f"Initializing AI Analyzer for project {project_id}")
+            
             # Obtener credenciales
-            credentials, _ = google.auth.default()
+            try:
+                # Intentar usar Application Default Credentials
+                credentials, _ = google.auth.default()
+                logger.info("Using Application Default Credentials")
+            except Exception as e:
+                logger.error(f"Failed to get default credentials: {e}")
+                logger.info("Proceeding without explicit credentials...")
+                credentials = None
             
-            # Inicializar Vertex AI con credenciales
-            vertexai.init(
-                project=project_id, 
-                location=location,
-                credentials=credentials
-            )
-            
-            # Usar Gemini Pro
-            self.model = GenerativeModel("gemini-pro")
-            
-            # Configuración de generación
-            self.generation_config = GenerationConfig(
-                temperature=0.2,
-                top_p=0.8,
-                top_k=40,
-                max_output_tokens=1024,
-            )
-            
-            # Executor para operaciones síncronas
-            self.executor = ThreadPoolExecutor(max_workers=3)
-            
-            logger.info(f"AI Analyzer initialized with Gemini Pro for project {project_id}")
-            
+            # Inicializar Vertex AI
+            try:
+                if credentials:
+                    vertexai.init(
+                        project=project_id, 
+                        location=location,
+                        credentials=credentials
+                    )
+                else:
+                    # Sin credenciales explícitas, confiar en las ADC de Cloud Run
+                    vertexai.init(
+                        project=project_id, 
+                        location=location
+                    )
+                
+                # Usar Gemini Pro
+                self.model = GenerativeModel("gemini-pro")
+                
+                # Configuración de generación
+                self.generation_config = GenerationConfig(
+                    temperature=0.2,
+                    top_p=0.8,
+                    top_k=40,
+                    max_output_tokens=1024,
+                )
+                
+                # Executor para operaciones síncronas
+                self.executor = ThreadPoolExecutor(max_workers=3)
+                
+                logger.info(f"AI Analyzer initialized with Gemini Pro for project {project_id}")
+                
+            except Exception as e:
+                logger.error(f"Failed to initialize AI Model: {e}")
+                self.model = None
+                
         except Exception as e:
             logger.error(f"Failed to initialize AI Analyzer: {e}")
             # Fallback a análisis simple si falla Vertex AI
