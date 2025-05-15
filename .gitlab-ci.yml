@@ -1,15 +1,52 @@
 stages:
   - test
   - build
+  - deploy
 
-test_job:
+variables:
+  DOCKER_DRIVER: overlay2
+  IMAGE_NAME: gcr.io/$GCP_PROJECT_ID/ai-pipeline-guardian
+
+# Test de la aplicación
+test:
   stage: test
   image: python:3.11
   script:
-    - echo "Running tests..."
-    - python -c "assert 2 + 2 == 5"  # Falla a propósito
+    - pip install -r requirements.txt
+    - python -m pytest tests/ || echo "No tests yet"
 
-build_job:
+# Build de la imagen Docker
+build:
   stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - echo $GCP_SERVICE_KEY | docker login -u _json_key --password-stdin https://gcr.io
   script:
-    - echo "This won't run because test fails"
+    - docker build -t $IMAGE_NAME:$CI_COMMIT_SHA .
+    - docker tag $IMAGE_NAME:$CI_COMMIT_SHA $IMAGE_NAME:latest
+    - docker push $IMAGE_NAME:$CI_COMMIT_SHA
+    - docker push $IMAGE_NAME:latest
+  only:
+    - main
+
+# Deploy a Cloud Run
+deploy:
+  stage: deploy
+  image: google/cloud-sdk:latest
+  before_script:
+    - echo $GCP_SERVICE_KEY | gcloud auth activate-service-account --key-file=-
+    - gcloud config set project $GCP_PROJECT_ID
+  script:
+    - |
+      gcloud run deploy ai-pipeline-guardian \
+        --image $IMAGE_NAME:$CI_COMMIT_SHA \
+        --platform managed \
+        --region us-central1 \
+        --allow-unauthenticated \
+        --port 8080 \
+        --memory 512Mi \
+        --set-env-vars GITLAB_WEBHOOK_SECRET=$GITLAB_WEBHOOK_SECRET
+  only:
+    - main

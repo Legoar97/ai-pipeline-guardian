@@ -1,20 +1,21 @@
-# Usamos una imagen base de Python 3.11
 FROM python:3.11-slim
 
-# Establecemos el directorio de trabajo dentro del contenedor
 WORKDIR /app
 
-# Copiamos el archivo de requisitos
-COPY requirements.txt .
+# Instalar dependencias del sistema si las necesitas
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
 
-# Instalamos las dependencias
+# Copiar solo requirements primero (mejor cache de Docker)
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiamos el código fuente del proyecto
-COPY . .
+# Copiar el resto del código
+COPY app/ app/
 
-# Exponemos el puerto en el que la aplicación estará corriendo
+# Puerto por defecto de Cloud Run
 EXPOSE 8080
 
-# Comando para ejecutar la aplicación con Uvicorn (apuntando a app.main)
+# Comando para iniciar la aplicación
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
