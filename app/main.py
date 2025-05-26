@@ -55,68 +55,523 @@ async def root():
     <html>
         <head>
             <title>AI Pipeline Guardian</title>
+            <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+            <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
             <style>
-                body { font-family: Arial, sans-serif; margin: 40px; background-color: #f5f5f5; }
-                .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-                .status { color: #28a745; font-weight: bold; font-size: 1.2em; }
-                .info { background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin-top: 20px; }
-                code { background-color: #e9ecef; padding: 3px 6px; border-radius: 3px; font-family: monospace; }
-                .feature { margin: 15px 0; padding-left: 25px; position: relative; }
-                .feature:before { content: "✓"; position: absolute; left: 0; color: #28a745; font-weight: bold; }
-                h1 { color: #333; }
-                h3 { color: #555; margin-top: 25px; }
-                .badge { display: inline-block; padding: 5px 10px; border-radius: 15px; font-size: 0.85em; margin-left: 10px; }
-                .badge-ai { background-color: #7c3aed; color: white; }
-                .badge-ready { background-color: #28a745; color: white; }
-                .badge-duo { background-color: #ff6b6b; color: white; }
-                .stats { display: flex; justify-content: space-around; margin: 20px 0; }
-                .stat-box { text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px; }
-                .stat-value { font-size: 2em; font-weight: bold; color: #7c3aed; }
-                .stat-label { color: #666; font-size: 0.9em; }
-                .protection { background: #d4edda; color: #155724; padding: 10px; border-radius: 5px; margin: 10px 0; }
-                .dashboard-link { display: inline-block; margin-top: 20px; padding: 12px 24px; background: #7c3aed; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; }
-                .dashboard-link:hover { background: #6d28d9; color: white; }
+                :root {
+                    --primary: #0F172A;
+                    --secondary: #1E293B;
+                    --accent: #3B82F6;
+                    --success: #10B981;
+                    --warning: #F59E0B;
+                    --danger: #EF4444;
+                    --text-primary: #F8FAFC;
+                    --text-secondary: #CBD5E1;
+                    --border: #334155;
+                    --bg-card: #1E293B;
+                    --bg-hover: #334155;
+                }
+                
+                * {
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                }
+                
+                body {
+                    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+                    background: var(--primary);
+                    color: var(--text-primary);
+                    line-height: 1.6;
+                    min-height: 100vh;
+                }
+                
+                .container {
+                    max-width: 1200px;
+                    margin: 0 auto;
+                    padding: 2rem;
+                }
+                
+                .header {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin-bottom: 3rem;
+                    padding-bottom: 2rem;
+                    border-bottom: 1px solid var(--border);
+                }
+                
+                .logo {
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                }
+                
+                .logo-icon {
+                    width: 48px;
+                    height: 48px;
+                    background: var(--accent);
+                    border-radius: 12px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 24px;
+                }
+                
+                .logo-text h1 {
+                    font-size: 1.875rem;
+                    font-weight: 700;
+                    margin: 0;
+                }
+                
+                .logo-text p {
+                    font-size: 0.875rem;
+                    color: var(--text-secondary);
+                    margin: 0;
+                }
+                
+                .status-badge {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    background: var(--bg-card);
+                    padding: 0.75rem 1.5rem;
+                    border-radius: 50px;
+                    border: 1px solid var(--border);
+                }
+                
+                .status-indicator {
+                    width: 8px;
+                    height: 8px;
+                    background: var(--success);
+                    border-radius: 50%;
+                    animation: pulse 2s infinite;
+                }
+                
+                @keyframes pulse {
+                    0% { opacity: 1; }
+                    50% { opacity: 0.5; }
+                    100% { opacity: 1; }
+                }
+                
+                .grid {
+                    display: grid;
+                    gap: 1.5rem;
+                    margin-bottom: 2rem;
+                }
+                
+                .stats-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                    gap: 1rem;
+                    margin-bottom: 2rem;
+                }
+                
+                .stat-card {
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    border-radius: 12px;
+                    padding: 1.5rem;
+                    transition: all 0.3s ease;
+                }
+                
+                .stat-card:hover {
+                    border-color: var(--accent);
+                    transform: translateY(-2px);
+                }
+                
+                .stat-header {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin-bottom: 1rem;
+                }
+                
+                .stat-icon {
+                    width: 40px;
+                    height: 40px;
+                    background: rgba(59, 130, 246, 0.1);
+                    border-radius: 8px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: var(--accent);
+                }
+                
+                .stat-value {
+                    font-size: 2rem;
+                    font-weight: 700;
+                    margin-bottom: 0.25rem;
+                }
+                
+                .stat-label {
+                    font-size: 0.875rem;
+                    color: var(--text-secondary);
+                }
+                
+                .card {
+                    background: var(--bg-card);
+                    border: 1px solid var(--border);
+                    border-radius: 12px;
+                    padding: 2rem;
+                }
+                
+                .card-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                    margin-bottom: 1.5rem;
+                }
+                
+                .card-icon {
+                    width: 32px;
+                    height: 32px;
+                    background: rgba(59, 130, 246, 0.1);
+                    border-radius: 8px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: var(--accent);
+                }
+                
+                .card-title {
+                    font-size: 1.25rem;
+                    font-weight: 600;
+                }
+                
+                .feature-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                    gap: 1rem;
+                    margin-bottom: 2rem;
+                }
+                
+                .feature-card {
+                    background: rgba(30, 41, 59, 0.5);
+                    border: 1px solid var(--border);
+                    border-radius: 8px;
+                    padding: 1.5rem;
+                    transition: all 0.3s ease;
+                }
+                
+                .feature-card:hover {
+                    background: var(--bg-hover);
+                    border-color: var(--accent);
+                }
+                
+                .feature-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                    margin-bottom: 0.75rem;
+                }
+                
+                .feature-icon {
+                    width: 32px;
+                    height: 32px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: var(--accent);
+                }
+                
+                .feature-title {
+                    font-weight: 600;
+                    font-size: 1rem;
+                }
+                
+                .feature-description {
+                    font-size: 0.875rem;
+                    color: var(--text-secondary);
+                    line-height: 1.5;
+                }
+                
+                .endpoints-grid {
+                    display: grid;
+                    gap: 0.75rem;
+                }
+                
+                .endpoint {
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                    padding: 0.75rem 1rem;
+                    background: rgba(30, 41, 59, 0.5);
+                    border: 1px solid var(--border);
+                    border-radius: 6px;
+                    transition: all 0.3s ease;
+                }
+                
+                .endpoint:hover {
+                    background: var(--bg-hover);
+                    border-color: var(--accent);
+                }
+                
+                .method {
+                    font-size: 0.75rem;
+                    font-weight: 600;
+                    padding: 0.25rem 0.5rem;
+                    border-radius: 4px;
+                    background: rgba(59, 130, 246, 0.2);
+                    color: var(--accent);
+                    min-width: 50px;
+                    text-align: center;
+                }
+                
+                .endpoint-path {
+                    font-family: 'Monaco', 'Consolas', monospace;
+                    font-size: 0.875rem;
+                    color: var(--text-primary);
+                }
+                
+                .endpoint-description {
+                    margin-left: auto;
+                    font-size: 0.875rem;
+                    color: var(--text-secondary);
+                }
+                
+                .dashboard-btn {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.75rem;
+                    background: var(--accent);
+                    color: white;
+                    padding: 1rem 2rem;
+                    border-radius: 8px;
+                    text-decoration: none;
+                    font-weight: 600;
+                    transition: all 0.3s ease;
+                    margin-top: 2rem;
+                }
+                
+                .dashboard-btn:hover {
+                    background: #2563EB;
+                    transform: translateY(-2px);
+                    box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+                }
+                
+                .tech-stack {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 0.5rem;
+                    margin-top: 1rem;
+                }
+                
+                .tech-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.5rem 1rem;
+                    background: rgba(30, 41, 59, 0.5);
+                    border: 1px solid var(--border);
+                    border-radius: 6px;
+                    font-size: 0.875rem;
+                }
+                
+                .tech-badge i {
+                    color: var(--accent);
+                }
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>🤖 AI Pipeline Guardian <span class="badge badge-ai">AI-Powered</span> <span class="badge badge-duo">Duo Enhanced</span></h1>
-                <p class="status">Status: Active <span class="badge badge-ready">Ready</span></p>
+                <header class="header">
+                    <div class="logo">
+                        <div class="logo-icon">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <div class="logo-text">
+                            <h1>AI Pipeline Guardian</h1>
+                            <p>Intelligent CI/CD Failure Resolution</p>
+                        </div>
+                    </div>
+                    <div class="status-badge">
+                        <span class="status-indicator"></span>
+                        <span>System Operational</span>
+                    </div>
+                </header>
                 
-                <div class="protection">
-                    ✅ <strong>Loop Protection Active:</strong> Duplicate pipeline processing prevented<br>
-                    ✅ <strong>Firestore Connected:</strong> """ + ("Yes" if firestore_client.db else "No") + """
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div class="stat-icon">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                        </div>
+                        <div class="stat-value">5</div>
+                        <div class="stat-label">Auto-Fix Types Available</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div class="stat-icon">
+                                <i class="fas fa-brain"></i>
+                            </div>
+                        </div>
+                        <div class="stat-value">Gemini 2.0</div>
+                        <div class="stat-label">AI Model</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div class="stat-icon">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                        </div>
+                        <div class="stat-value">""" + ("Active" if GITLAB_ACCESS_TOKEN else "Missing") + """</div>
+                        <div class="stat-label">GitLab Integration</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div class="stat-icon">
+                                <i class="fas fa-database"></i>
+                            </div>
+                        </div>
+                        <div class="stat-value">""" + ("Firestore" if firestore_client.db else "Memory") + """</div>
+                        <div class="stat-label">Data Storage</div>
+                    </div>
                 </div>
                 
-                <div class="info">
-                    <h3>Configuration</h3>
-                    <p><strong>Webhook URL:</strong> <code>POST /webhook</code></p>
-                    <p><strong>Dashboard:</strong> <code>GET /dashboard</code></p>
-                    <p><strong>GitLab Events:</strong> Pipeline Hook</p>
-                    <p><strong>AI Model:</strong> Vertex AI (Gemini 2.0 Flash) 🧠</p>
-                    <p><strong>GitLab Duo:</strong> <span class="badge badge-duo">Enabled</span> 🚀</p>
-                    <p><strong>Access Token:</strong> """ + ("✅ Configured" if GITLAB_ACCESS_TOKEN else "❌ Missing") + """</p>
-                    <p><strong>Data Persistence:</strong> """ + ("✅ Firestore" if firestore_client.db else "⚠️ In-Memory Only") + """</p>
-                    
-                    <h3>Features</h3>
-                    <div class="feature">Automatic failure analysis with AI</div>
-                    <div class="feature">Smart retry for transient errors</div>
-                    <div class="feature">GitLab Duo integration for code fixes</div>
-                    <div class="feature">Auto-generated MRs with fixes</div>
-                    <div class="feature">Intelligent comments on commits</div>
-                    <div class="feature">Real-time analytics dashboard</div>
-                    <div class="feature">Loop prevention system</div>
-                    <div class="feature">Persistent data storage with Firestore</div>
-                    
-                    <h3>API Endpoints</h3>
-                    <p><code>GET /health</code> - Health check</p>
-                    <p><code>GET /dashboard</code> - Analytics dashboard</p>
-                    <p><code>GET /stats</code> - Raw statistics API</p>
-                    <p><code>POST /webhook</code> - GitLab webhook receiver</p>
-                    <p><code>POST /analyze</code> - Manual analysis trigger</p>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">
+                            <i class="fas fa-magic"></i>
+                        </div>
+                        <h2 class="card-title">Automatic Fix Capabilities</h2>
+                    </div>
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <div class="feature-header">
+                                <div class="feature-icon">
+                                    <i class="fas fa-cube"></i>
+                                </div>
+                                <h3 class="feature-title">Dependency Resolution</h3>
+                            </div>
+                            <p class="feature-description">Automatically detects missing Python packages and creates MRs to add them to requirements.txt</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-header">
+                                <div class="feature-icon">
+                                    <i class="fas fa-code"></i>
+                                </div>
+                                <h3 class="feature-title">Syntax Error Correction</h3>
+                            </div>
+                            <p class="feature-description">Fixes common Python syntax errors like missing parentheses, quotes, or colons</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-header">
+                                <div class="feature-icon">
+                                    <i class="fas fa-clock"></i>
+                                </div>
+                                <h3 class="feature-title">Timeout Optimization</h3>
+                            </div>
+                            <p class="feature-description">Increases job timeouts in .gitlab-ci.yml when jobs exceed time limits</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-header">
+                                <div class="feature-icon">
+                                    <i class="fas fa-shield-alt"></i>
+                                </div>
+                                <h3 class="feature-title">Security Updates</h3>
+                            </div>
+                            <p class="feature-description">Updates vulnerable packages to secure versions when CVEs are detected</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-header">
+                                <div class="feature-icon">
+                                    <i class="fas fa-cog"></i>
+                                </div>
+                                <h3 class="feature-title">Configuration Fixes</h3>
+                            </div>
+                            <p class="feature-description">Creates .env.example files for missing environment variables</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-header">
+                                <div class="feature-icon">
+                                    <i class="fas fa-sync-alt"></i>
+                                </div>
+                                <h3 class="feature-title">Smart Retries</h3>
+                            </div>
+                            <p class="feature-description">Automatically retries transient failures like network errors</p>
+                        </div>
+                    </div>
                 </div>
                 
-                <a href="/dashboard" class="dashboard-link">View Analytics Dashboard →</a>
+                <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 2rem;">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <i class="fas fa-plug"></i>
+                            </div>
+                            <h2 class="card-title">API Endpoints</h2>
+                        </div>
+                        <div class="endpoints-grid">
+                            <div class="endpoint">
+                                <span class="method">GET</span>
+                                <span class="endpoint-path">/health</span>
+                                <span class="endpoint-description">Health check</span>
+                            </div>
+                            <div class="endpoint">
+                                <span class="method">GET</span>
+                                <span class="endpoint-path">/dashboard</span>
+                                <span class="endpoint-description">Analytics dashboard</span>
+                            </div>
+                            <div class="endpoint">
+                                <span class="method">GET</span>
+                                <span class="endpoint-path">/stats</span>
+                                <span class="endpoint-description">Raw statistics</span>
+                            </div>
+                            <div class="endpoint">
+                                <span class="method">POST</span>
+                                <span class="endpoint-path">/webhook</span>
+                                <span class="endpoint-description">GitLab webhook</span>
+                            </div>
+                            <div class="endpoint">
+                                <span class="method">POST</span>
+                                <span class="endpoint-path">/analyze</span>
+                                <span class="endpoint-description">Manual analysis</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">
+                                <i class="fas fa-layer-group"></i>
+                            </div>
+                            <h2 class="card-title">Technology Stack</h2>
+                        </div>
+                        <div class="tech-stack">
+                            <div class="tech-badge">
+                                <i class="fab fa-python"></i>
+                                <span>Python 3.11</span>
+                            </div>
+                            <div class="tech-badge">
+                                <i class="fab fa-google"></i>
+                                <span>Vertex AI</span>
+                            </div>
+                            <div class="tech-badge">
+                                <i class="fas fa-cloud"></i>
+                                <span>Cloud Run</span>
+                            </div>
+                            <div class="tech-badge">
+                                <i class="fab fa-gitlab"></i>
+                                <span>GitLab Duo</span>
+                            </div>
+                            <div class="tech-badge">
+                                <i class="fas fa-database"></i>
+                                <span>Firestore</span>
+                            </div>
+                            <div class="tech-badge">
+                                <i class="fab fa-docker"></i>
+                                <span>Docker</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <a href="/dashboard" class="dashboard-btn">
+                    <i class="fas fa-chart-line"></i>
+                    View Analytics Dashboard
+                </a>
             </div>
         </body>
     </html>
@@ -252,20 +707,25 @@ async def gitlab_webhook(
                 mr_created = False
                 duo_enhanced = False
                 
-                if analysis['error_category'] in ['dependency', 'syntax_error']:
+                if analysis['error_category'] in ['dependency', 'syntax_error', 'timeout', 'security', 'configuration']:
                     logger.info("🧠 Enhancing analysis with GitLab Duo...")
                     
-                    # Extract module name for dependency errors
-                    module_name = None
-                    if analysis['error_category'] == 'dependency' and 'ModuleNotFoundError' in job_log:
-                        # Extract module name from error
-                        match = re.search(r"No module named '([^']+)'", job_log)
-                        if match:
-                            module_name = match.group(1)
-                            logger.info(f"Detected missing module: {module_name}")
+                    # Extract error details
+                    error_details = analysis.get('error_details', {})
                     
-                    # Check if we already created an MR for this type of error in this project
-                    existing_mrs = created_mrs[f"{project_id}:{analysis['error_category']}:{module_name}"]
+                    # For dependency errors
+                    if analysis['error_category'] == 'dependency':
+                        module_name = error_details.get('missing_module')
+                        if not module_name and 'ModuleNotFoundError' in job_log:
+                            match = re.search(r"No module named '([^']+)'", job_log)
+                            if match:
+                                module_name = match.group(1)
+                                error_details['missing_module'] = module_name
+                    
+                    # Check if we already created an MR for this error
+                    mr_key = f"{project_id}:{analysis['error_category']}:{json.dumps(error_details, sort_keys=True)}"
+                    existing_mrs = created_mrs[mr_key]
+                    
                     if existing_mrs:
                         recent_mr = existing_mrs[-1]
                         if datetime.now() - recent_mr['timestamp'] < timedelta(hours=1):
@@ -274,64 +734,46 @@ async def gitlab_webhook(
                             analysis['mr_exists'] = True
                             mr_created = False
                         else:
-                            # Create new MR if the last one is old
                             mr_created = True
                     else:
                         mr_created = True
                     
-                    if mr_created:
-                        duo_result = await duo_client.suggest_fix(
+                    if mr_created and analysis['recommended_action'] == 'automatic_fix':
+                        # Prepare fix data
+                        fix_data = {
+                            'error_type': analysis['error_category'],
+                            'pipeline_id': pipeline_id,
+                            'job_name': job_name,
+                            'error_explanation': analysis['error_explanation'],
+                            'analysis_confidence': 95,
+                            **error_details  # Include all extracted error details
+                        }
+                        
+                        # Try to create auto-fix MR
+                        logger.info(f"Creating auto-fix MR for {analysis['error_category']} error")
+                        mr_result = await duo_client.create_fix_mr(
+                            gitlab_client=gitlab_client,
                             project_id=project_id,
-                            error_type=analysis['error_category'],
-                            error_details={
-                                'module': module_name,
-                                'error_line': job_log.split('\n')[-5] if analysis['error_category'] == 'syntax_error' else '',
-                                'error_explanation': analysis['error_explanation'],
-                                'job_name': job_name,
-                                'pipeline_id': pipeline_id
-                            }
+                            source_branch=ref,
+                            fix_data=fix_data
                         )
                         
-                        duo_enhanced = duo_result.get('success', False)
-                        
-                        # If Duo has high confidence, create an MR
-                        if duo_result.get('success') and duo_result.get('confidence', 0) > 0.85:
-                            logger.info(f"🚀 Duo suggests fix with {duo_result['confidence']*100}% confidence")
-                            
-                            # Auto-create MR for dependency errors
-                            if analysis['error_category'] == 'dependency' and module_name:
-                                logger.info(f"Creating auto-fix MR for missing module: {module_name}")
-                                mr_result = await duo_client.create_fix_mr(
-                                    gitlab_client=gitlab_client,
-                                    project_id=project_id,
-                                    source_branch=ref,
-                                    fix_data={
-                                        'error_type': 'dependency',
-                                        'module': module_name,
-                                        'pipeline_id': pipeline_id,
-                                        'job_name': job_name,
-                                        'error_explanation': analysis['error_explanation'],
-                                        'explanation': duo_result['explanation'],
-                                        'confidence': duo_result['confidence'],
-                                        'analysis_confidence': 95,
-                                        'fix_description': f"Add {module_name} to requirements.txt"
-                                    }
-                                )
-                                
-                                if mr_result.get('success'):
-                                    mr_created = True
-                                    mr_count += 1
-                                    logger.info(f"✅ Created MR: {mr_result['mr_url']}")
-                                    # Track this MR
-                                    created_mrs[f"{project_id}:{analysis['error_category']}:{module_name}"].append({
-                                        'url': mr_result['mr_url'],
-                                        'timestamp': datetime.now()
-                                    })
-                                    # Update analysis with MR info
-                                    analysis['mr_url'] = mr_result['mr_url']
-                                    analysis['mr_created'] = True
-                                else:
-                                    mr_created = False
+                        if mr_result.get('success'):
+                            mr_created = True
+                            mr_count += 1
+                            logger.info(f"✅ Created MR: {mr_result['mr_url']}")
+                            # Track this MR
+                            created_mrs[mr_key].append({
+                                'url': mr_result['mr_url'],
+                                'timestamp': datetime.now()
+                            })
+                            # Update analysis with MR info
+                            analysis['mr_url'] = mr_result['mr_url']
+                            analysis['mr_created'] = True
+                            duo_enhanced = True
+                        else:
+                            mr_created = False
+                            logger.error(f"Failed to create MR: {mr_result.get('error')}")
                 
                 # Store analysis result
                 analysis_result = {
@@ -378,8 +820,7 @@ async def gitlab_webhook(
                     comment += f"""
 
 **🧠 GitLab Duo Enhancement:**
-AI confidence: {duo_result.get('confidence', 0)*100:.0f}%
-{duo_result.get('explanation', '')}"""
+AI-powered automatic fix has been implemented."""
 
                 # Add MR link if created or exists
                 if 'mr_url' in analysis:
@@ -522,7 +963,8 @@ async def health_check():
         "version": "3.0.0",
         "token_configured": bool(GITLAB_ACCESS_TOKEN),
         "loop_protection": "active",
-        "firestore_connected": bool(firestore_client.db)
+        "firestore_connected": bool(firestore_client.db),
+        "auto_fix_types": ["dependency", "syntax_error", "timeout", "security", "configuration"]
     }
 
 @app.get("/stats")
@@ -571,7 +1013,14 @@ async def get_stats():
             "hourly_rate_saved": total_time_saved * 60 / 60,
             "loop_protection_active": True,
             "recent_pipelines_processed": recent_pipelines,
-            "data_source": "memory"
+            "data_source": "memory",
+            "auto_fix_capabilities": {
+                "dependency": "Adds missing modules to requirements.txt",
+                "syntax_error": "Fixes Python syntax errors",
+                "timeout": "Increases job timeout in CI config",
+                "security": "Updates vulnerable packages",
+                "configuration": "Creates .env.example for missing vars"
+            }
         }
 
 # Add endpoint for pipeline start (component compatibility)
