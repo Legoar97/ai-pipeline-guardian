@@ -3,240 +3,453 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Pipeline Guardian - Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>AI Pipeline Guardian - Analytics Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
     <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            background-color: #f8f9fa; 
+        :root {
+            --primary-color: #7c3aed;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --dark-bg: #1a1a1a;
+            --card-bg: #ffffff;
         }
-        .card {
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f3f4f6;
+            color: #1f2937;
         }
-        .card-header {
-            background-color: #7c3aed;
-            color: white;
-            border-top-left-radius: 10px;
-            border-top-right-radius: 10px;
-            font-weight: bold;
+        
+        .navbar {
+            background-color: var(--dark-bg) !important;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
-        .stat-card {
-            text-align: center;
-            padding: 20px;
+        
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
         }
-        .stat-value {
+        
+        .metric-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: none;
+            height: 100%;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .metric-value {
             font-size: 2.5rem;
-            font-weight: bold;
-            color: #343a40;
+            font-weight: 700;
+            margin: 0;
+            color: var(--primary-color);
         }
-        .stat-title {
-            font-size: 1rem;
-            color: #6c757d;
+        
+        .metric-label {
+            font-size: 0.875rem;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 8px;
         }
-        .nav-link.active {
-            background-color: #7c3aed !important;
-            color: white !important;
+        
+        .metric-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 16px;
         }
-        .table-hover tbody tr:hover {
+        
+        .metric-icon.primary {
             background-color: rgba(124, 58, 237, 0.1);
+            color: var(--primary-color);
+        }
+        
+        .metric-icon.success {
+            background-color: rgba(16, 185, 129, 0.1);
+            color: var(--success-color);
+        }
+        
+        .metric-icon.warning {
+            background-color: rgba(245, 158, 11, 0.1);
+            color: var(--warning-color);
+        }
+        
+        .metric-icon.danger {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: var(--danger-color);
+        }
+        
+        .chart-container {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            height: 400px;
+            position: relative;
+        }
+        
+        .chart-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #1f2937;
+        }
+        
+        .recent-analyses {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .analysis-item {
+            padding: 16px;
+            border-bottom: 1px solid #e5e7eb;
+            transition: background-color 0.2s;
+        }
+        
+        .analysis-item:hover {
+            background-color: #f9fafb;
+        }
+        
+        .analysis-item:last-child {
+            border-bottom: none;
+        }
+        
+        .badge-custom {
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+        
+        .time-saved-banner {
+            background: linear-gradient(135deg, var(--primary-color), #9333ea);
+            color: white;
+            border-radius: 12px;
+            padding: 32px;
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        
+        .time-saved-value {
+            font-size: 3rem;
+            font-weight: 800;
+            margin: 0;
+        }
+        
+        .time-saved-label {
+            font-size: 1.125rem;
+            opacity: 0.9;
+        }
+        
+        .refresh-btn {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .refresh-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
+        }
+        
+        .loading-spinner {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .error-pattern-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .error-pattern-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .error-pattern-item:last-child {
+            border-bottom: none;
+        }
+        
+        .pattern-name {
+            font-weight: 500;
+            color: #374151;
+        }
+        
+        .pattern-count {
+            background-color: #f3f4f6;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #4b5563;
         }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container">
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
             <a class="navbar-brand" href="/">
-                🤖 AI Pipeline Guardian
+                <i class="fas fa-robot me-2"></i>AI Pipeline Guardian
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link" href="/">Home</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/dashboard">Dashboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/config">Configuration</a>
-                    </li>
-                </ul>
+            <div class="navbar-nav ms-auto">
+                <span class="navbar-text me-3">
+                    <i class="fas fa-circle text-success me-1"></i> Live Dashboard
+                </span>
+                <span class="navbar-text">
+                    <small>Last updated: <span id="lastUpdate">{{ last_update }}</span></small>
+                </span>
             </div>
         </div>
     </nav>
 
-    <div class="container mt-4">
-        <h1 class="mb-4">Dashboard</h1>
-        
-        <div class="row">
-            <div class="col-md-3">
-                <div class="card stat-card">
-                    <div class="stat-value text-primary">{{ stats.total_pipelines }}</div>
-                    <div class="stat-title">Pipelines Monitored</div>
+    <div class="container-fluid mt-4">
+        <!-- Time Saved Banner -->
+        <div class="time-saved-banner">
+            <div class="time-saved-value">{{ stats.time_saved_hours }} hours</div>
+            <div class="time-saved-label">Developer Time Saved</div>
+            <div class="mt-3">
+                <small>Equivalent to ${{ stats.time_saved_hours * 60 }} at $60/hour</small>
+            </div>
+        </div>
+
+        <!-- Metrics Row -->
+        <div class="row g-4 mb-4">
+            <div class="col-xl-3 col-lg-6">
+                <div class="metric-card">
+                    <div class="metric-icon primary">
+                        <i class="fas fa-code-branch"></i>
+                    </div>
+                    <p class="metric-value">{{ stats.total_pipelines }}</p>
+                    <p class="metric-label">Pipelines Analyzed</p>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card stat-card">
-                    <div class="stat-value text-danger">{{ stats.failure_rate }}%</div>
-                    <div class="stat-title">Failure Rate</div>
+            <div class="col-xl-3 col-lg-6">
+                <div class="metric-card">
+                    <div class="metric-icon success">
+                        <i class="fas fa-magic"></i>
+                    </div>
+                    <p class="metric-value">{{ stats.total_mrs_created }}</p>
+                    <p class="metric-label">Auto-Generated MRs</p>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card stat-card">
-                    <div class="stat-value text-success">{{ stats.automatic_fixes }}</div>
-                    <div class="stat-title">Automatic Fixes</div>
+            <div class="col-xl-3 col-lg-6">
+                <div class="metric-card">
+                    <div class="metric-icon warning">
+                        <i class="fas fa-redo"></i>
+                    </div>
+                    <p class="metric-value">{{ stats.total_retries }}</p>
+                    <p class="metric-label">Automatic Retries</p>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card stat-card">
-                    <div class="stat-value text-info">{{ hours_saved }}</div>
-                    <div class="stat-title">Dev Hours Saved</div>
+            <div class="col-xl-3 col-lg-6">
+                <div class="metric-card">
+                    <div class="metric-icon danger">
+                        <i class="fas fa-percentage"></i>
+                    </div>
+                    <p class="metric-value">{{ stats.success_rate }}%</p>
+                    <p class="metric-label">Success Rate</p>
                 </div>
             </div>
         </div>
-        
-        <div class="row mt-4">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        Error Categories Distribution
-                    </div>
-                    <div class="card-body">
-                        <canvas id="errorCategoriesChart" height="250"></canvas>
-                    </div>
+
+        <!-- Charts Row -->
+        <div class="row g-4 mb-4">
+            <div class="col-lg-8">
+                <div class="chart-container">
+                    <h3 class="chart-title">Daily Analysis Trend</h3>
+                    <canvas id="dailyChart"></canvas>
                 </div>
             </div>
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        Weekly Analysis
-                    </div>
-                    <div class="card-body">
-                        <canvas id="weeklyAnalysisChart" height="250"></canvas>
-                    </div>
+            <div class="col-lg-4">
+                <div class="chart-container">
+                    <h3 class="chart-title">Error Categories</h3>
+                    <canvas id="categoriesChart"></canvas>
                 </div>
             </div>
         </div>
-        
-        <div class="row mt-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        Recent Activity
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Pipeline ID</th>
-                                        <th>Project</th>
-                                        <th>Status</th>
-                                        <th>Action</th>
-                                        <th>Time</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for pipeline in stats.recent_pipelines %}
-                                    <tr>
-                                        <td>#{{ pipeline.id }}</td>
-                                        <td>{{ pipeline.project }}</td>
-                                        <td>
-                                            {% if pipeline.status == "fixed" %}
-                                            <span class="badge bg-success">Fixed</span>
-                                            {% else %}
-                                            <span class="badge bg-primary">Analyzed</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if pipeline.action == "retry" %}
-                                            <span>Automatic retry</span>
-                                            {% elif pipeline.action == "automatic_fix" %}
-                                            <span>Automatic fix</span>
-                                            {% else %}
-                                            <span>Manual suggestion</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>{{ pipeline.time }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+
+        <!-- Bottom Row -->
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="recent-analyses">
+                    <h3 class="chart-title">Recent Analyses</h3>
+                    <div class="analyses-list">
+                        {% for analysis in stats.recent_analyses %}
+                        <div class="analysis-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">{{ analysis.project_name }}</h6>
+                                    <small class="text-muted">Pipeline #{{ analysis.pipeline_id }}</small>
+                                </div>
+                                <div class="text-end">
+                                    {% if analysis.status == 'fixed' %}
+                                    <span class="badge bg-success badge-custom">
+                                        <i class="fas fa-check me-1"></i>Fixed
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-primary badge-custom">
+                                        <i class="fas fa-search me-1"></i>Analyzed
+                                    </span>
+                                    {% endif %}
+                                    <div class="mt-1">
+                                        {% for error_type in analysis.error_types %}
+                                        <span class="badge bg-secondary badge-custom me-1">{{ error_type }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+                        {% endfor %}
                     </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="recent-analyses">
+                    <h3 class="chart-title">Common Error Patterns</h3>
+                    <ul class="error-pattern-list">
+                        {% for pattern in stats.error_patterns %}
+                        <li class="error-pattern-item">
+                            <span class="pattern-name">{{ pattern.type }}</span>
+                            <span class="pattern-count">{{ pattern.count }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Pie Chart for Error Categories
-        const categoriesCtx = document.getElementById('errorCategoriesChart').getContext('2d');
-        const categoriesData = {
-            labels: [{% for category in stats.category_breakdown %}"{{ category.name }}"{% if not loop.last %}, {% endif %}{% endfor %}],
-            datasets: [{
-                data: [{% for category in stats.category_breakdown %}{{ category.value }}{% if not loop.last %}, {% endif %}{% endfor %}],
-                backgroundColor: [
-                    '#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#FF6B6B'
-                ],
-                borderWidth: 1
-            }]
-        };
-        new Chart(categoriesCtx, {
-            type: 'pie',
-            data: categoriesData,
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'right',
-                    }
-                }
-            }
-        });
+    <!-- Refresh Button -->
+    <button class="refresh-btn" onclick="location.reload()">
+        <i class="fas fa-sync-alt"></i>
+    </button>
 
-        // Line Chart for Weekly Analysis
-        const weeklyCtx = document.getElementById('weeklyAnalysisChart').getContext('2d');
-        const weeklyData = {
-            labels: [{% for item in stats.weekly_analysis %}"{{ item.day }}"{% if not loop.last %}, {% endif %}{% endfor %}],
-            datasets: [
-                {
-                    label: 'Pipelines Analyzed',
-                    data: [{% for item in stats.weekly_analysis %}{{ item.count }}{% if not loop.last %}, {% endif %}{% endfor %}],
+    <!-- Loading Spinner -->
+    <div class="loading-spinner">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
+    <script>
+        // Chart.js configuration
+        Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        
+        // Daily Trend Chart
+        const dailyCtx = document.getElementById('dailyChart').getContext('2d');
+        const dailyChart = new Chart(dailyCtx, {
+            type: 'line',
+            data: {
+                labels: {{ stats.daily_stats | map(attribute='day') | list | tojson }},
+                datasets: [{
+                    label: 'Analyses',
+                    data: {{ stats.daily_stats | map(attribute='analyses') | list | tojson }},
                     borderColor: '#7c3aed',
                     backgroundColor: 'rgba(124, 58, 237, 0.1)',
-                    tension: 0.1,
+                    tension: 0.3,
                     fill: true
-                },
-                {
-                    label: 'Automatic Fixes',
-                    data: [{% for item in stats.weekly_analysis %}{{ item.fixes }}{% if not loop.last %}, {% endif %}{% endfor %}],
-                    borderColor: '#00C49F',
-                    backgroundColor: 'rgba(0, 196, 159, 0.1)',
-                    tension: 0.1,
+                }, {
+                    label: 'Fixes',
+                    data: {{ stats.daily_stats | map(attribute='fixes') | list | tojson }},
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    tension: 0.3,
                     fill: true
-                }
-            ]
-        };
-        new Chart(weeklyCtx, {
-            type: 'line',
-            data: weeklyData,
+                }]
+            },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                },
                 scales: {
                     y: {
-                        beginAtZero: true
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        }
                     }
                 }
             }
         });
+        
+        // Categories Pie Chart
+        const categoriesCtx = document.getElementById('categoriesChart').getContext('2d');
+        const categoriesChart = new Chart(categoriesCtx, {
+            type: 'doughnut',
+            data: {
+                labels: {{ stats.error_categories.keys() | list | tojson }},
+                datasets: [{
+                    data: {{ stats.error_categories.values() | list | tojson }},
+                    backgroundColor: [
+                        '#7c3aed',
+                        '#10b981',
+                        '#f59e0b',
+                        '#ef4444',
+                        '#6366f1',
+                        '#ec4899'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+        
+        // Auto-refresh every 30 seconds
+        setInterval(() => {
+            document.querySelector('.refresh-btn i').classList.add('fa-spin');
+            location.reload();
+        }, 30000);
+        
+        // Update last update time
+        document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
     </script>
 </body>
 </html>
