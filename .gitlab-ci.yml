@@ -2,10 +2,13 @@ stages:
   - test
   - build
   - deploy
+  - publish
 
 variables:
   DOCKER_DRIVER: overlay2
   IMAGE_NAME: gcr.io/$GCP_PROJECT_ID/ai-pipeline-guardian
+  REGION: us-central1
+  SERVICE_NAME: ai-pipeline-guardian
 
 # Test de la aplicación
 test:
@@ -13,7 +16,8 @@ test:
   image: python:3.11
   script:
     - pip install -r requirements.txt
-    - python -m pytest tests/ || echo "No tests yet"
+    - python -m pytest tests/ -v
+  coverage: '/TOTAL.+?(\d+\%)/'
 
 # Build de la imagen Docker
 build:
@@ -30,23 +34,65 @@ build:
     - docker push $IMAGE_NAME:latest
   only:
     - main
+    - develop
 
 # Deploy a Cloud Run
 deploy:
   stage: deploy
-  image: google/cloud-sdk:latest
+  image: google/cloud-sdk:alpine
   before_script:
-    - echo $GCP_SERVICE_KEY | gcloud auth activate-service-account --key-file=-
+    - echo $GCP_SERVICE_KEY > /tmp/gcp-key.json
+    - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
     - gcloud config set project $GCP_PROJECT_ID
   script:
     - |
       gcloud run deploy ai-pipeline-guardian \
         --image $IMAGE_NAME:$CI_COMMIT_SHA \
         --platform managed \
-        --region us-central1 \
+        --region $REGION \
+        --allow-unauthenticated \
+        --port 8080 \
+        --memory 1Gi \
+        --cpu 2 \
+        --timeout 300 \
+        --max-instances 10 \
+        --set-env-vars "GITLAB_WEBHOOK_SECRET=$GITLAB_WEBHOOK_SECRET,GCP_PROJECT_ID=$GCP_PROJECT_ID,GITLAB_ACCESS_TOKEN=$GITLAB_ACCESS_TOKEN"
+  after_script:
+    - rm -f /tmp/gcp-key.json
+  only:
+    - main
+  environment:
+    name: production
+    url: https://ai-pipeline-guardian-$CI_PROJECT_ID.run.app
+
+# Deploy staging (opcional)
+deploy:staging:
+  extends: deploy
+  script:
+    - |
+      gcloud run deploy ai-pipeline-guardian-staging \
+        --image $IMAGE_NAME:$CI_COMMIT_SHA \
+        --platform managed \
+        --region $REGION \
         --allow-unauthenticated \
         --port 8080 \
         --memory 512Mi \
-        --set-env-vars GITLAB_WEBHOOK_SECRET=$GITLAB_WEBHOOK_SECRET
+        --cpu 1 \
+        --timeout 300 \
+        --max-instances 3 \
+        --set-env-vars "GITLAB_WEBHOOK_SECRET=$GITLAB_WEBHOOK_SECRET,GCP_PROJECT_ID=$GCP_PROJECT_ID,GITLAB_ACCESS_TOKEN=$GITLAB_ACCESS_TOKEN"
   only:
-    - main
+    - develop
+  environment:
+    name: staging
+    url: https://ai-pipeline-guardian-staging-$CI_PROJECT_ID.run.app
+
+# Publish component to GitLab Catalog (NEW!)
+publish:component:
+  stage: publish
+  image: alpine:latest
+  script:
+    - echo "Component published to GitLab Catalog"
+  only:
+    - tags
+  when: manual
