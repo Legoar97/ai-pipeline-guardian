@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 from app.gitlab_client import GitLabClient
 from app.ai_analyzer import AIAnalyzer
-from app.duo_client import GitLabDuoClient
+from app.vertex_ai_fixer import VertexAIFixer
 from app.firestore_client import FirestoreClient
 
 # Configure logging
@@ -30,7 +30,7 @@ GITLAB_ACCESS_TOKEN = os.getenv("GITLAB_ACCESS_TOKEN", "")
 # Initialize clients
 gitlab_client = GitLabClient(token=GITLAB_ACCESS_TOKEN)
 ai_analyzer = AIAnalyzer()
-duo_client = GitLabDuoClient(token=GITLAB_ACCESS_TOKEN)
+vertex_fixer = VertexAIFixer(token=GITLAB_ACCESS_TOKEN)
 firestore_client = FirestoreClient()
 
 # In-memory storage for analytics (backup when Firestore is down)
@@ -408,7 +408,7 @@ async def root():
                             </div>
                         </div>
                         <div class="stat-value">Gemini 2.0</div>
-                        <div class="stat-label">AI Model</div>
+                        <div class="stat-label">AI Model (Vertex AI)</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header">
@@ -554,7 +554,7 @@ async def root():
                             </div>
                             <div class="tech-badge">
                                 <i class="fab fa-gitlab"></i>
-                                <span>GitLab Duo</span>
+                                <span>GitLab API</span>
                             </div>
                             <div class="tech-badge">
                                 <i class="fas fa-database"></i>
@@ -703,24 +703,33 @@ async def gitlab_webhook(
                     }
                 )
                 
-                # Enhanced analysis with Duo for specific error types
+                # Enhanced analysis with Vertex AI for specific error types
                 mr_created = False
-                duo_enhanced = False
+                vertex_enhanced = False
                 
                 if analysis['error_category'] in ['dependency', 'syntax_error', 'timeout', 'security', 'configuration']:
-                    logger.info("🧠 Enhancing analysis with GitLab Duo...")
+                    logger.info("🧠 Enhancing analysis with Vertex AI...")
                     
                     # Extract error details
                     error_details = analysis.get('error_details', {})
+                    error_details['language'] = analysis.get('language', 'python')
                     
                     # For dependency errors
                     if analysis['error_category'] == 'dependency':
                         module_name = error_details.get('missing_module')
-                        if not module_name and 'ModuleNotFoundError' in job_log:
-                            match = re.search(r"No module named '([^']+)'", job_log)
-                            if match:
-                                module_name = match.group(1)
-                                error_details['missing_module'] = module_name
+                        if not module_name:
+                            # Language-specific extraction
+                            language = error_details.get('language', 'python')
+                            if language == 'python' and 'ModuleNotFoundError' in job_log:
+                                match = re.search(r"No module named '([^']+)'", job_log)
+                                if match:
+                                    module_name = match.group(1)
+                                    error_details['missing_module'] = module_name
+                            elif language == 'javascript' and 'Cannot find module' in job_log:
+                                match = re.search(r"Cannot find module '([^']+)'", job_log)
+                                if match:
+                                    module_name = match.group(1)
+                                    error_details['missing_module'] = module_name
                     
                     # Check if we already created an MR for this error
                     mr_key = f"{project_id}:{analysis['error_category']}:{json.dumps(error_details, sort_keys=True)}"
@@ -739,41 +748,53 @@ async def gitlab_webhook(
                         mr_created = True
                     
                     if mr_created and analysis['recommended_action'] == 'automatic_fix':
-                        # Prepare fix data
-                        fix_data = {
-                            'error_type': analysis['error_category'],
-                            'pipeline_id': pipeline_id,
-                            'job_name': job_name,
-                            'error_explanation': analysis['error_explanation'],
-                            'analysis_confidence': 95,
-                            **error_details  # Include all extracted error details
-                        }
-                        
-                        # Try to create auto-fix MR
-                        logger.info(f"Creating auto-fix MR for {analysis['error_category']} error")
-                        mr_result = await duo_client.create_fix_mr(
-                            gitlab_client=gitlab_client,
+                        # Get AI-powered fix suggestion
+                        fix_suggestion = await vertex_fixer.suggest_fix(
                             project_id=project_id,
-                            source_branch=ref,
-                            fix_data=fix_data
+                            error_type=analysis['error_category'],
+                            error_details=error_details,
+                            job_log=job_log
                         )
                         
-                        if mr_result.get('success'):
-                            mr_created = True
-                            mr_count += 1
-                            logger.info(f"✅ Created MR: {mr_result['mr_url']}")
-                            # Track this MR
-                            created_mrs[mr_key].append({
-                                'url': mr_result['mr_url'],
-                                'timestamp': datetime.now()
-                            })
-                            # Update analysis with MR info
-                            analysis['mr_url'] = mr_result['mr_url']
-                            analysis['mr_created'] = True
-                            duo_enhanced = True
-                        else:
-                            mr_created = False
-                            logger.error(f"Failed to create MR: {mr_result.get('error')}")
+                        if fix_suggestion.get('success'):
+                            # Prepare fix data
+                            fix_data = {
+                                'error_type': analysis['error_category'],
+                                'pipeline_id': pipeline_id,
+                                'job_name': job_name,
+                                'error_explanation': analysis['error_explanation'],
+                                'analysis_confidence': 95,
+                                'explanation': fix_suggestion.get('explanation'),
+                                'confidence': fix_suggestion.get('confidence', 85),
+                                'language': analysis.get('language', 'python'),
+                                **error_details  # Include all extracted error details
+                            }
+                            
+                            # Try to create auto-fix MR
+                            logger.info(f"Creating auto-fix MR for {analysis['error_category']} error")
+                            mr_result = await vertex_fixer.create_fix_mr(
+                                gitlab_client=gitlab_client,
+                                project_id=project_id,
+                                source_branch=ref,
+                                fix_data=fix_data
+                            )
+                            
+                            if mr_result.get('success'):
+                                mr_created = True
+                                mr_count += 1
+                                logger.info(f"✅ Created MR: {mr_result['mr_url']}")
+                                # Track this MR
+                                created_mrs[mr_key].append({
+                                    'url': mr_result['mr_url'],
+                                    'timestamp': datetime.now()
+                                })
+                                # Update analysis with MR info
+                                analysis['mr_url'] = mr_result['mr_url']
+                                analysis['mr_created'] = True
+                                vertex_enhanced = True
+                            else:
+                                mr_created = False
+                                logger.error(f"Failed to create MR: {mr_result.get('error')}")
                 
                 # Store analysis result
                 analysis_result = {
@@ -782,7 +803,7 @@ async def gitlab_webhook(
                     "error_category": analysis['error_category'],
                     "recommended_action": analysis['recommended_action'],
                     "timestamp": datetime.now().isoformat(),
-                    "duo_enhanced": duo_enhanced,
+                    "vertex_enhanced": vertex_enhanced,
                     "mr_created": mr_created
                 }
                 analyses.append(analysis_result)
@@ -800,10 +821,12 @@ async def gitlab_webhook(
                         logger.warning("No GitLab token configured for retry")
 
                 # Create a comment with the analysis
+                language = analysis.get('language', 'python')
                 comment = f"""🤖 **AI Pipeline Guardian Analysis**
 
 **Pipeline:** #{pipeline_id} on `{ref}`
 **Job:** `{job_name}`
+**Language:** `{language.upper()}`
 **Status:** Failed ❌
 
 **🔍 Error Analysis:**
@@ -815,12 +838,12 @@ async def gitlab_webhook(
 **💡 Suggested Solution:**
 {analysis['suggested_solution']}"""
 
-                # Add Duo enhancement if available
-                if duo_enhanced:
+                # Add Vertex AI enhancement if available
+                if vertex_enhanced:
                     comment += f"""
 
-**🧠 GitLab Duo Enhancement:**
-AI-powered automatic fix has been implemented."""
+**🧠 Google Vertex AI Enhancement:**
+AI-powered automatic fix has been implemented using Gemini 2.0 Flash."""
 
                 # Add MR link if created or exists
                 if 'mr_url' in analysis:
@@ -844,7 +867,8 @@ The AI has created a merge request with the necessary fix. Please review and mer
                 comment += """
 
 ---
-*This analysis was generated automatically by AI Pipeline Guardian with GitLab Duo*"""
+*This analysis was generated automatically by AI Pipeline Guardian*
+*Powered by Google Cloud Vertex AI (Gemini 2.0 Flash)*"""
                 
                 # Try to comment (only once per pipeline)
                 if GITLAB_ACCESS_TOKEN and comment_count == 0:  # Only comment once
@@ -872,6 +896,12 @@ The AI has created a merge request with the necessary fix. Please review and mer
                     logger.info("Skipping additional comments to avoid spam")
             
             # Store complete analysis in Firestore
+            # Get commit SHA if available
+            commit_sha = None
+            commits = body.get("commits", [])
+            if commits:
+                commit_sha = commits[-1].get("id")
+            
             pipeline_data = {
                 "pipeline_id": pipeline_id,
                 "project_id": project_id,
@@ -908,7 +938,7 @@ The AI has created a merge request with the necessary fix. Please review and mer
                 "jobs_retried": retry_count,
                 "comments_posted": comment_count,
                 "mrs_created": mr_count,
-                "duo_enhanced": any(a.get('duo_enhanced') for a in analyses),
+                "vertex_enhanced": any(a.get('vertex_enhanced') for a in analyses),
                 "analyses": analyses,
                 "saved_to_firestore": bool(firestore_client.db)
             }
@@ -958,13 +988,14 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "ai-pipeline-guardian",
-        "ai": "vertex-ai-gemini-2.0-flash",
-        "duo": "enabled",
+        "vertex_ai": "enabled",
+        "ai_model": "gemini-2.0-flash",
         "version": "3.0.0",
         "token_configured": bool(GITLAB_ACCESS_TOKEN),
         "loop_protection": "active",
         "firestore_connected": bool(firestore_client.db),
-        "auto_fix_types": ["dependency", "syntax_error", "timeout", "security", "configuration"]
+        "auto_fix_types": ["dependency", "syntax_error", "timeout", "security", "configuration"],
+        "supported_languages": ["python", "javascript", "java", "go", "ruby", "php", "rust", "csharp", "typescript"]
     }
 
 @app.get("/stats")
@@ -986,10 +1017,10 @@ async def get_stats():
                 cat = analysis.get('error_category', 'other')
                 categories[cat] = categories.get(cat, 0) + 1
         
-        # Duo usage stats
-        duo_enhanced_count = sum(1 for p in pipeline_analytics 
-                                for a in p.get('analyses', []) 
-                                if a.get('duo_enhanced'))
+        # Vertex AI usage stats
+        vertex_enhanced_count = sum(1 for p in pipeline_analytics 
+                                   for a in p.get('analyses', []) 
+                                   if a.get('vertex_enhanced'))
         
         # Recent pipelines processed
         recent_pipelines = []
@@ -1006,7 +1037,7 @@ async def get_stats():
             "total_jobs_retried": sum(p.get('retried_jobs', 0) for p in pipeline_analytics),
             "total_mrs_created": sum(p.get('mrs_created', 0) for p in pipeline_analytics),
             "total_time_saved_minutes": total_time_saved,
-            "duo_enhanced_analyses": duo_enhanced_count,
+            "vertex_ai_enhanced_analyses": vertex_enhanced_count,
             "success_rate": round(sum(p.get('retried_jobs', 0) for p in pipeline_analytics) / max(total_pipelines, 1) * 100, 1),
             "error_categories": categories,
             "recent_analyses": pipeline_analytics[-10:] if pipeline_analytics else [],
@@ -1014,6 +1045,7 @@ async def get_stats():
             "loop_protection_active": True,
             "recent_pipelines_processed": recent_pipelines,
             "data_source": "memory",
+            "ai_technology": "Google Vertex AI - Gemini 2.0 Flash",
             "auto_fix_capabilities": {
                 "dependency": "Adds missing modules to requirements.txt",
                 "syntax_error": "Fixes Python syntax errors",
