@@ -13,6 +13,7 @@ from app.gitlab_client import GitLabClient
 from app.ai_analyzer import AIAnalyzer
 from app.vertex_ai_fixer import VertexAIFixer
 from app.firestore_client import FirestoreClient
+from app.ai_predictor import AIPredictor
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -32,6 +33,7 @@ gitlab_client = GitLabClient(token=GITLAB_ACCESS_TOKEN)
 ai_analyzer = AIAnalyzer()
 vertex_fixer = VertexAIFixer(token=GITLAB_ACCESS_TOKEN)
 firestore_client = FirestoreClient()
+ai_predictor = AIPredictor()
 
 # In-memory storage for analytics (backup when Firestore is down)
 pipeline_analytics = []
@@ -44,6 +46,7 @@ created_mrs = defaultdict(list)
 async def startup_event():
     """Initialize services on startup"""
     logger.info("AI Pipeline Guardian starting up...")
+    logger.info("🔮 Predictive analysis enabled")
     # Clean up old data (older than 30 days)
     if firestore_client.db:
         await firestore_client.cleanup_old_data(30)
@@ -371,6 +374,25 @@ async def root():
                 .tech-badge i {
                     color: var(--accent);
                 }
+                
+                .prediction-banner {
+                    background: linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%);
+                    border: 1px solid rgba(168, 85, 247, 0.3);
+                    border-radius: 12px;
+                    padding: 1.5rem;
+                    margin-bottom: 2rem;
+                    text-align: center;
+                }
+                
+                .prediction-banner h2 {
+                    font-size: 1.5rem;
+                    margin-bottom: 0.5rem;
+                    color: #A855F7;
+                }
+                
+                .prediction-banner p {
+                    color: var(--text-secondary);
+                }
             </style>
         </head>
         <body>
@@ -382,7 +404,7 @@ async def root():
                         </div>
                         <div class="logo-text">
                             <h1>AI Pipeline Guardian</h1>
-                            <p>Intelligent CI/CD Failure Resolution</p>
+                            <p>Predictive CI/CD Failure Prevention</p>
                         </div>
                     </div>
                     <div class="status-badge">
@@ -391,15 +413,29 @@ async def root():
                     </div>
                 </header>
                 
+                <div class="prediction-banner">
+                    <h2>🔮 Now with Predictive Intelligence</h2>
+                    <p>Prevent pipeline failures before they happen with AI-powered predictions</p>
+                </div>
+                
                 <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div class="stat-icon">
+                                <i class="fas fa-crystal-ball"></i>
+                            </div>
+                        </div>
+                        <div class="stat-value">Predictive</div>
+                        <div class="stat-label">Failure Prevention Mode</div>
+                    </div>
                     <div class="stat-card">
                         <div class="stat-header">
                             <div class="stat-icon">
                                 <i class="fas fa-robot"></i>
                             </div>
                         </div>
-                        <div class="stat-value">5</div>
-                        <div class="stat-label">Auto-Fix Types Available</div>
+                        <div class="stat-value">5 + Predict</div>
+                        <div class="stat-label">AI Capabilities</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-header">
@@ -428,6 +464,15 @@ async def root():
                         <div class="stat-value">""" + ("Firestore" if firestore_client.db else "Memory") + """</div>
                         <div class="stat-label">Data Storage</div>
                     </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <div class="stat-icon">
+                                <i class="fas fa-code-branch"></i>
+                            </div>
+                        </div>
+                        <div class="stat-value">GraphQL</div>
+                        <div class="stat-label">API Support</div>
+                    </div>
                 </div>
                 
                 <div class="card">
@@ -435,9 +480,18 @@ async def root():
                         <div class="card-icon">
                             <i class="fas fa-magic"></i>
                         </div>
-                        <h2 class="card-title">Automatic Fix Capabilities</h2>
+                        <h2 class="card-title">AI-Powered Capabilities</h2>
                     </div>
                     <div class="feature-grid">
+                        <div class="feature-card" style="border-color: #A855F7;">
+                            <div class="feature-header">
+                                <div class="feature-icon" style="color: #A855F7;">
+                                    <i class="fas fa-crystal-ball"></i>
+                                </div>
+                                <h3 class="feature-title">Predictive Failure Detection</h3>
+                            </div>
+                            <p class="feature-description">Analyzes historical patterns to predict pipeline failures before they occur</p>
+                        </div>
                         <div class="feature-card">
                             <div class="feature-header">
                                 <div class="feature-icon">
@@ -445,7 +499,7 @@ async def root():
                                 </div>
                                 <h3 class="feature-title">Dependency Resolution</h3>
                             </div>
-                            <p class="feature-description">Automatically detects missing Python packages and creates MRs to add them to requirements.txt</p>
+                            <p class="feature-description">Automatically detects missing packages and creates MRs to add them</p>
                         </div>
                         <div class="feature-card">
                             <div class="feature-header">
@@ -454,7 +508,7 @@ async def root():
                                 </div>
                                 <h3 class="feature-title">Syntax Error Correction</h3>
                             </div>
-                            <p class="feature-description">Fixes common Python syntax errors like missing parentheses, quotes, or colons</p>
+                            <p class="feature-description">Fixes common syntax errors across 9 programming languages</p>
                         </div>
                         <div class="feature-card">
                             <div class="feature-header">
@@ -463,7 +517,7 @@ async def root():
                                 </div>
                                 <h3 class="feature-title">Timeout Optimization</h3>
                             </div>
-                            <p class="feature-description">Increases job timeouts in .gitlab-ci.yml when jobs exceed time limits</p>
+                            <p class="feature-description">Increases job timeouts when jobs exceed time limits</p>
                         </div>
                         <div class="feature-card">
                             <div class="feature-header">
@@ -477,20 +531,11 @@ async def root():
                         <div class="feature-card">
                             <div class="feature-header">
                                 <div class="feature-icon">
-                                    <i class="fas fa-cog"></i>
+                                    <i class="fas fa-chart-line"></i>
                                 </div>
-                                <h3 class="feature-title">Configuration Fixes</h3>
+                                <h3 class="feature-title">Pattern Learning</h3>
                             </div>
-                            <p class="feature-description">Creates .env.example files for missing environment variables</p>
-                        </div>
-                        <div class="feature-card">
-                            <div class="feature-header">
-                                <div class="feature-icon">
-                                    <i class="fas fa-sync-alt"></i>
-                                </div>
-                                <h3 class="feature-title">Smart Retries</h3>
-                            </div>
-                            <p class="feature-description">Automatically retries transient failures like network errors</p>
+                            <p class="feature-description">Learns from failure patterns across your organization</p>
                         </div>
                     </div>
                 </div>
@@ -526,6 +571,11 @@ async def root():
                             </div>
                             <div class="endpoint">
                                 <span class="method">POST</span>
+                                <span class="endpoint-path">/predict</span>
+                                <span class="endpoint-description">Predict failure</span>
+                            </div>
+                            <div class="endpoint">
+                                <span class="method">POST</span>
                                 <span class="endpoint-path">/analyze</span>
                                 <span class="endpoint-description">Manual analysis</span>
                             </div>
@@ -555,6 +605,10 @@ async def root():
                             <div class="tech-badge">
                                 <i class="fab fa-gitlab"></i>
                                 <span>GitLab API</span>
+                            </div>
+                            <div class="tech-badge">
+                                <i class="fas fa-code-branch"></i>
+                                <span>GraphQL</span>
                             </div>
                             <div class="tech-badge">
                                 <i class="fas fa-database"></i>
@@ -618,9 +672,84 @@ async def gitlab_webhook(
         object_attributes = body.get("object_attributes", {})
         status = object_attributes.get("status")
         
+        # NEW: Handle running pipelines for prediction
+        if status == "running":
+            project = body.get("project", {})
+            project_id = project.get("id")
+            project_name = project.get("name")
+            project_path = project.get("path_with_namespace")
+            pipeline_id = object_attributes.get("id")
+            ref = object_attributes.get("ref", "unknown")
+            
+            logger.info(f"🔮 Pipeline {pipeline_id} started - analyzing risk...")
+            
+            try:
+                # Get historical data via GraphQL
+                if project_path:
+                    historical_stats = await gitlab_client.get_project_statistics_graphql(project_path)
+                    historical_pipelines = await gitlab_client.get_project_pipelines_graphql(project_path, last_n=50)
+                    
+                    # Analyze patterns
+                    pattern_analysis = ai_predictor.analyze_failure_patterns(historical_pipelines)
+                    
+                    # Count recent commits (simplified - you could enhance this)
+                    recent_commits = len(body.get("commits", []))
+                    
+                    # Predict failure risk
+                    current_pipeline = {
+                        "id": pipeline_id,
+                        "ref": ref,
+                        "status": status,
+                        "created_at": object_attributes.get("created_at")
+                    }
+                    
+                    prediction = ai_predictor.predict_failure_risk(
+                        current_pipeline=current_pipeline,
+                        historical_data=pattern_analysis,
+                        recent_commits=recent_commits
+                    )
+                    
+                    logger.info(f"Risk Score: {prediction['risk_score']} ({prediction['risk_level']})")
+                    
+                    # If high risk, create preventive issue
+                    if prediction['risk_score'] >= 0.7:
+                        issue_title = f"⚠️ High Risk Alert: Pipeline #{pipeline_id} likely to fail"
+                        issue_description = ai_predictor.get_predictive_comment(prediction, project_name)
+                        
+                        issue = await gitlab_client.create_issue(
+                            project_id=project_id,
+                            title=issue_title,
+                            description=issue_description
+                        )
+                        
+                        if issue:
+                            logger.info(f"✅ Created preventive issue #{issue.get('iid')}")
+                            
+                            # Store prediction in Firestore
+                            await firestore_client.save_pipeline_analysis({
+                                "pipeline_id": pipeline_id,
+                                "project_id": project_id,
+                                "project_name": project_name,
+                                "timestamp": datetime.now(),
+                                "prediction": prediction,
+                                "issue_created": issue.get('iid'),
+                                "type": "prediction"
+                            })
+                    
+                    return {
+                        "status": "predicted",
+                        "risk_score": prediction['risk_score'],
+                        "risk_level": prediction['risk_level'],
+                        "insights": pattern_analysis.get('insights', [])
+                    }
+                
+            except Exception as e:
+                logger.error(f"Error in predictive analysis: {e}")
+                # Continue with normal processing
+        
         # Only process failed pipelines that are complete
         if status != "failed":
-            logger.info(f"Pipeline status is '{status}', skipping")
+            logger.info(f"Pipeline status is '{status}', skipping failure analysis")
             return {"status": "skipped", "reason": f"Pipeline status is {status}"}
         
         project = body.get("project", {})
@@ -957,6 +1086,40 @@ The AI has created a merge request with the necessary fix. Please review and mer
     
     return {"status": "received", "event": x_gitlab_event}
 
+@app.post("/predict/{project_id}/{pipeline_id}")
+async def predict_pipeline_failure(project_id: int, pipeline_id: int):
+    """Manual endpoint to predict pipeline failure risk"""
+    try:
+        # Get project path (you might need to get this from GitLab API)
+        project_path = f"user/project"  # This should be fetched from GitLab
+        
+        # Get historical data
+        historical_stats = await gitlab_client.get_project_statistics_graphql(project_path)
+        historical_pipelines = await gitlab_client.get_project_pipelines_graphql(project_path, last_n=100)
+        
+        # Analyze patterns
+        pattern_analysis = ai_predictor.analyze_failure_patterns(historical_pipelines)
+        
+        # Get current pipeline details
+        current_pipeline = await gitlab_client.get_pipeline_details(project_id, pipeline_id)
+        
+        # Predict
+        prediction = ai_predictor.predict_failure_risk(
+            current_pipeline=current_pipeline,
+            historical_data=pattern_analysis,
+            recent_commits=0  # You could fetch this
+        )
+        
+        return {
+            "prediction": prediction,
+            "patterns": pattern_analysis,
+            "statistics": historical_stats
+        }
+        
+    except Exception as e:
+        logger.error(f"Prediction error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/analyze")
 async def manual_analyze(request: Request):
     """Endpoint for manual analysis from CI/CD component"""
@@ -990,12 +1153,14 @@ async def health_check():
         "service": "ai-pipeline-guardian",
         "vertex_ai": "enabled",
         "ai_model": "gemini-2.0-flash",
-        "version": "3.0.0",
+        "version": "4.0.0",
         "token_configured": bool(GITLAB_ACCESS_TOKEN),
         "loop_protection": "active",
         "firestore_connected": bool(firestore_client.db),
         "auto_fix_types": ["dependency", "syntax_error", "timeout", "security", "configuration"],
-        "supported_languages": ["python", "javascript", "java", "go", "ruby", "php", "rust", "csharp", "typescript"]
+        "supported_languages": ["python", "javascript", "java", "go", "ruby", "php", "rust", "csharp", "typescript"],
+        "predictive_analysis": "enabled",
+        "graphql_support": "enabled"
     }
 
 @app.get("/stats")
@@ -1004,6 +1169,8 @@ async def get_stats():
     if firestore_client.db:
         # Get stats from Firestore
         stats = await firestore_client.get_dashboard_stats()
+        stats["predictions_enabled"] = True
+        stats["graphql_queries"] = True
         return stats
     else:
         # Fallback to in-memory stats
@@ -1052,7 +1219,9 @@ async def get_stats():
                 "timeout": "Increases job timeout in CI config",
                 "security": "Updates vulnerable packages",
                 "configuration": "Creates .env.example for missing vars"
-            }
+            },
+            "predictions_enabled": True,
+            "graphql_queries": True
         }
 
 # Add endpoint for pipeline start (component compatibility)
