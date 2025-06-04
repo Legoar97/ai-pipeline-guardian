@@ -43,23 +43,26 @@ class GitLabClient:
                 return {}
     
     async def get_project_pipelines_graphql(self, project_path: str, last_n: int = 100) -> List[Dict]:
-        """Get pipeline history via GraphQL for pattern analysis"""
+        """Obtiene el historial de pipelines vía GraphQL con datos enriquecidos para análisis."""
+        # Consulta GraphQL mejorada para obtener más 'features'
         query = """
         query($projectPath: ID!, $first: Int!) {
           project(fullPath: $projectPath) {
             name
-            pipelines(first: $first) {
+            pipelines(first: $first, orderBy: {field: CREATED_AT, direction: DESC}) {
               nodes {
                 id
+                iid
                 status
                 duration
                 createdAt
                 finishedAt
-                failureReason
-                ref
-                sha
                 source
-                jobs {
+                user {
+                  name
+                  username
+                }
+                jobs(first: 20) {
                   nodes {
                     name
                     status
@@ -82,11 +85,11 @@ class GitLabClient:
         
         if result and "project" in result and result["project"]:
             pipelines = result["project"].get("pipelines", {}).get("nodes", [])
-            logger.info(f"Retrieved {len(pipelines)} pipelines via GraphQL")
+            logger.info(f"Retrieved {len(pipelines)} historical pipelines via GraphQL for project {project_path}")
             return pipelines
         
         return []
-    
+
     async def get_project_statistics_graphql(self, project_path: str) -> Dict:
         """Get project statistics for prediction model"""
         # Calculate date range for last 30 days
