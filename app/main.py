@@ -414,15 +414,15 @@ async def root():
                 </header>
                 
                 <div class="prediction-banner">
-                    <h2>🔮 Now with Predictive Intelligence</h2>
+                    <h2>Now with Predictive Intelligence</h2>
                     <p>Prevent pipeline failures before they happen with AI-powered predictions</p>
                 </div>
-                
+
                 <div class="stats-grid">
                     <div class="stat-card">
                         <div class="stat-header">
                             <div class="stat-icon">
-                                <i class="fas fa-crystal-ball"></i>
+                                <i class="fas fa-eye"></i>
                             </div>
                         </div>
                         <div class="stat-value">Predictive</div>
@@ -474,7 +474,7 @@ async def root():
                         <div class="stat-label">API Support</div>
                     </div>
                 </div>
-                
+
                 <div class="card">
                     <div class="card-header">
                         <div class="card-icon">
@@ -486,7 +486,7 @@ async def root():
                         <div class="feature-card" style="border-color: #A855F7;">
                             <div class="feature-header">
                                 <div class="feature-icon" style="color: #A855F7;">
-                                    <i class="fas fa-crystal-ball"></i>
+                                    <i class="fas fa-eye"></i>
                                 </div>
                                 <h3 class="feature-title">Predictive Failure Detection</h3>
                             </div>
@@ -539,7 +539,7 @@ async def root():
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 2rem;">
                     <div class="card">
                         <div class="card-header">
